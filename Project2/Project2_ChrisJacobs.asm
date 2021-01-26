@@ -32,18 +32,20 @@ INCLUDE Irvine32.inc
 	extraCreditPrompt_3			BYTE	"**EC: Program repeats until the user chooses to quit",0
 	extraCreditPrompt_4			BYTE	"**EC: Program calculates the quotients A/B, A/C, B/C, printing the quotient and remainder",0
 
+
 	; Variables for input prompts
 	inputPrompt_A				BYTE	"First Number: ",0
 	inputPrompt_B				BYTE	"Second Numbner: ",0
 	inputPrompt_C				BYTE	"Third Number: ",0
+
 
 	; Variables to store user input
 	userInput_A					DWORD	?
 	userInput_B					DWORD	?
 	userInput_C					DWORD	?
 
-	; Variables to store each result as its calculated
 
+	; Variables to store each result as its calculated
 	result_A_plus_B				DWORD	? 
 	result_A_minus_B			DWORD	?
 
@@ -55,6 +57,7 @@ INCLUDE Irvine32.inc
 
 	result_A_plus_B_plus_C		DWORD	?
 
+
 	; Variables to store extra credit results
 	result_B_minus_A			DWORD	?
 	result_C_minus_A			DWORD	?
@@ -62,12 +65,24 @@ INCLUDE Irvine32.inc
 	
 	result_C_minus_B_minus_A	DWORD	?
 
+
+	; Variables to store quotient and remainders
+	result_A_div_B				DWORD	?
+	remainder_A_div_B			DWORD	?
+
+	result_A_div_C				DWORD	?
+	remainder_A_div_C			DWORD	?
+
+	result_B_div_C				DWORD	?
+	remainder_B_div_C			DWORD	?
+
+
 	; Subtraction, addition, and equal sign strings
 	sub_sign					BYTE	" - ",0
 	add_sign					BYTE	" + ",0
 	div_sign					BYTE	" / ",0
 	equal_sign					BYTE	" = ",0
-	r_prefix					BYTE	'r',0
+	r_prefix					BYTE	"r",0
 
 
 	; Error and exit variables
@@ -108,6 +123,7 @@ main PROC
 	CALL	WriteString
 	CALL	CrLf
 	CALL	CrLf
+
 
 ; Prompts the user with instructions, then prompts user to enter three numbers and store each in memory.
 ; Checks to see if inputs are in decending order. If not in decending order, throw error message and
@@ -151,7 +167,6 @@ _TryInputs:
 	JBE		_PromptNonDecendingError
 
 	CALL	CrLf
-
 
 ; Calculate and display summations
 
@@ -348,9 +363,77 @@ _TryInputs:
 
 ; Calculate and display quotients and remainder of A/B, A/C, B/C
 
-	
-	
+	MOV		EAX, userInput_A			; Display A/B equation
+	CALL	WriteDec
+	MOV		EDX, OFFSET div_sign
+	CALL	WriteString
+	MOV		EAX, userInput_B
+	CALL	WriteDec
+	MOV		EDX, OFFSET equal_sign
+	CALL	WriteString
 
+	MOV		EAX, userInput_A			; Calculate A/B
+	MOV		EDX, 0
+	MOV		EBX, userInput_B
+	DIV		EBX
+	MOV		result_A_div_B, EAX
+	MOV		remainder_A_div_B, EDX
+	
+	CALL	WriteDec					; Display result of A/B with remainder
+	MOV		EDX, OFFSET r_prefix
+	CALL	WriteString
+	MOV		EAX, remainder_A_div_B
+	CALL	WriteDec
+
+	CALL	CrLf
+
+	MOV		EAX, userInput_A			; Display A/C equation
+	CALL	WriteDec
+	MOV		EDX, OFFSET div_sign
+	CALL	WriteString
+	MOV		EAX, userInput_C
+	CALL	WriteDec
+	MOV		EDX, OFFSET equal_sign
+	CALL	WriteString
+
+	MOV		EAX, userInput_A			; Calculate A/C
+	MOV		EDX, 0
+	MOV		EBX, userInput_C
+	DIV		EBX
+	MOV		result_A_div_C, EAX
+	MOV		remainder_A_div_C, EDX
+	
+	CALL	WriteDec					; Display result of A/C with remainder
+	MOV		EDX, OFFSET r_prefix
+	CALL	WriteString
+	MOV		EAX, remainder_A_div_C
+	CALL	WriteDec
+
+	CALL	CrLf
+
+	MOV		EAX, userInput_B			; Display B/C equation
+	CALL	WriteDec
+	MOV		EDX, OFFSET div_sign
+	CALL	WriteString
+	MOV		EAX, userInput_C
+	CALL	WriteDec
+	MOV		EDX, OFFSET equal_sign
+	CALL	WriteString
+
+	MOV		EAX, userInput_B			; Calculate B/C
+	MOV		EDX, 0
+	MOV		EBX, userInput_C
+	DIV		EBX
+	MOV		result_B_div_C, EAX
+	MOV		remainder_B_div_C, EDX
+	
+	CALL	WriteDec					; Display result of B/C with remainder
+	MOV		EDX, OFFSET r_prefix
+	CALL	WriteString
+	MOV		EAX, remainder_B_div_C
+	CALL	WriteDec
+
+	CALL	CrLf
 
 ; Ask the user if they would like to continue. If they press enter, repeat the program.
 ; If the user enters X (or any other value), exit the program.
@@ -361,6 +444,7 @@ _TryInputs:
 	JC		_TryInputs						; if CF flag was set, user hit only enter, so jump to _TryInputs and repeat program
 	JMP		_PromptExitInputDetected		; otherwise, user hit "X" (or some other input), so exit program
 
+
 ; Display a closing message and exit the program
 _ExitProgram:
 
@@ -369,6 +453,7 @@ _ExitProgram:
 	CALL	WriteString
 	CALL	CrLf
 	Invoke	ExitProcess,0	; exit to operating system
+
 
 ; Prints an error message for non decending user input, then jumps back to _TryInputs
 _PromptNonDecendingError:
@@ -380,7 +465,10 @@ _PromptNonDecendingError:
 	CALL	CrLf
 	JMP		_TryInputs
 
+
+; Prints a message saying that the user has chosen to exit the program, then jumps to _ExitProgram
 _PromptExitInputDetected:
+	
 	CALL	CrLf
 	MOV		EDX, OFFSET exitDetectedPrompt
 	CALL	WriteString
@@ -388,6 +476,7 @@ _PromptExitInputDetected:
 	CALL	CrLf
 	JMP		_ExitProgram
 	
+
 main ENDP
 
 ; (insert additional procedures here)
