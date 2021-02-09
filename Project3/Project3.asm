@@ -27,7 +27,6 @@ UPPER_LIMIT_2 = -1
 
 nameAndProgramTitle		BYTE		"Project 3 - Min, Max and Average Calculator - By Chris Jacobs",0	
 extraCreditPrompt1		BYTE		"EC 1: Number the lines during user input. Increment the line number only for valid number entries.",0
-extraCreditPrompt2		BYTE		"EC 2: Calculate and display the average as a decimal-point number, rounded to the nearest .01",0
 
 namePrompt				BYTE		"Please enter your name: ",0
 userNameBuffer			BYTE		21 DUP(0)
@@ -46,6 +45,8 @@ minValue				SDWORD		?
 maxValue				SDWORD		?
 averageValue			SDWORD		?
 averageValueRemainder	SDWORD		?
+numInputsDiv2			SDWORD		?
+valueOf2				SDWORD		-2
 
 outOfRangeErrorPrompt	BYTE		"You entered a value outside the range of [-200 to -100] or [-50 to -1]. Please try again, or enter a positive number to quit.",0
 noInputsDetectedPrompt	BYTE		"You didn't input any values.",0
@@ -56,7 +57,6 @@ minValuePrompt			BYTE		"Minimum Value: ",0
 maxValuePrompt			BYTE		"Maximum Value: ",0
 sumOfInputsPrompt		BYTE		"Sum of all inputs: ",0
 averageValuePrompt		BYTE		"Rounded average of all inputs: ",0
-averageInDecimalPrompt  BYTE		"Average of all inputs in decimal form: ",0
 
 goodbyePrompt			BYTE		"Goodbye!",0
 
@@ -64,10 +64,6 @@ goodbyePrompt			BYTE		"Goodbye!",0
 lineNumberLabel			BYTE		"Line ",0
 lineNumberSpacer		BYTE		": ",0
 lineNumber				DWORD		1
-
-averageValueInDecimal	REAL4		?
-averageDecimalRemainder	REAL4		?
-averageDecimalPart		REAL4		?
 
 .code
 main PROC
@@ -80,9 +76,6 @@ main PROC
 	MOV		EDX, OFFSET extraCreditPrompt1
 	CALL	WriteString
 	CALL	Crlf
-	CALL	Crlf
-	MOV		EDX, OFFSET extraCreditPrompt2
-	CALL	WriteString
 	CALL	Crlf
 
 	; Prompt user to enter their name
@@ -188,7 +181,6 @@ main PROC
 			MOV		EDX, userInput
 			MOV		minValue, EDX
 
-
 		; Check if we have a new maxValue
 		_DetectNewMaxValue:
 
@@ -198,14 +190,12 @@ main PROC
 			MOV		EDX, userInput
 			MOV		maxValue, EDX
 
-
 		; Add new userInput to running total
 		_AddUserInputToTotal:
 			MOV		EDX, sumOfInputs
 			ADD		EDX, userInput
 			MOV		sumOfInputs, EDX
 			JMP		_InputLoop						; Repeat the loop
-
 
 		; Initialize minValue, maxValue and sumOfInputs to the value of the first input
 		_DetectedFirstInput:
@@ -237,26 +227,21 @@ main PROC
 		CDQ
 		IDIV	numInputs
 		MOV		averageValue, EAX
+		MOV		averageValueRemainder, EDX
 
-		; Store information for decimal average (Extra Credit)
-		MOV		averageValueInDecimal, EAX
-		MOV		averageDecimalRemainder, EDX
+		; Calculate half the value of numInputs
+		MOV		EDX, 0
+		MOV		EAX, numInputs
+		CDQ
+		IDIV	valueOf2
 
 		; Decide whether to round the non-decimal
-		CMP		EDX, -2
-		JNE		_DisplayResults
+		CMP		EAX, averageValueRemainder
+		JLE		_DisplayResults
 		MOV		EAX, averageValue
 		DEC		EAX
 		MOV		averageValue, EAX
 
-		; Calculate decimal average (Extra Credit)
-		MOV		EDX, 0
-		MOV		EAX, averageValueInDecimal
-		CDQ
-		IDIV	averageDecimalRemainder
-		ADD		averageValueInDecimal, EAX
-
-		
 
 	; Display results and then exit program
 	_DisplayResults:
@@ -300,20 +285,12 @@ main PROC
 		CALL	WriteInt
 		CALL	Crlf
 
-		; Display averageInDecimalPrompt and averageValueInDecimal
-		CALL	Crlf
-		MOV		EDX, OFFSET averageInDecimalPrompt
-		CALL	WriteString
-		MOV		EAX, averageValueInDecimal
-		CALL	WriteInt
-		CALL	Crlf
-
-
 	; Say goodbye and exit to operating system
 	_ExitProgram:
 		CALL	Crlf
 		MOV		EDX, OFFSET goodbyePrompt
 		CALL	WriteString
+		CALL	Crlf
 		Invoke	ExitProcess,0					; Exit to operating system
 
 	; Prompts user that no inputs were detected, then jumps to _ExitProgram
