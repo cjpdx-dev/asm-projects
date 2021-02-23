@@ -1,10 +1,10 @@
 TITLE Project 3    (Project3.asm)
 
 ; Author: Chris Jacobs
-; Last Modified: 2/9/2021
+; Last Modified: 2/8/2021
 ; OSU email address: jacobsc2@oregonstate.edu
 ; Course number/section:   CS271 Section 400
-; Project Number: 3                Due Date: 2/7	Submitted: 2/9 (2 Grace Days)
+; Project Number: 3                Due Date: 2/7	Submitted: 2/8 (1 Grace Days)
 ; Description: A MASM program that (1) displays the program title and programmer's name, (2) gets the user name and greets the user,
 ;				(3) repeatedly prompts the user to enter a number, (4) validates the user's input to be in a specific range, (5) notifies
 ;				the user of an invalid input, (6) counts and accumulates the valid user's numbers until a non-negative number is entered 
