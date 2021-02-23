@@ -17,6 +17,7 @@ INCLUDE Irvine32.inc
 
 UPPER_INPUT_BOUND = 200
 LOWER_INPUT_BOUND = 1
+START_PRIME = 2
 
 .data
 
@@ -31,9 +32,10 @@ userInput				DWORD		?
 validInputFlag			DWORD		1
 errorPrompt				BYTE		"ERROR: Invalid Input. Please enter an integer between 1 and 200: ",0
 
-start_prime				DWORD		2
-current_prime_output	DWORD		1
-output_spacer			BYTE		"   ",0
+testIsPrimeFlag			DWORD		1
+currentPrimeOutput		DWORD		1
+outputSpacer			BYTE		"   ",0
+numPrimesPrinted		DWORD		0
 
 
 goodbyePrompt			BYTE		"Goodbye!",0
@@ -219,13 +221,62 @@ ValidateInput ENDP
 ;
 ; Returns:
 ;
+; Note: The results must be displayed 10 prime numbers per line, in ascending order, with at 
+; least 3 spaces between the numbers. The final row may contain fewer than 10 values.
 ;---------------------------------------------------------
 ShowPrimes PROC
 	PUSH	EBP
 	MOV		EBP, ESP
-	; The results must be displayed 10 prime numbers per line, in ascending order, with at 
-	; least 3 spaces between the numbers. The final row may contain fewer than 10 values.
 	
+	MOV		EAX, START_PRIME		; EAX = current test prime
+	MOV		ECX, [EBP + 8]			; ECX = loop counter (userInput)
+	_showPrimesLoop:
+		MOV		testIsPrimeFlag, 1
+
+		_whileNotPrime:
+			CMP		testIsPrimeFlag, 0
+			JZ		_endWhileNotPrime
+
+			PUSH	EAX
+			PUSH	OFFSET testIsPrimeFlag
+			CALL	IsPrime
+
+			CMP		testIsPrimeFlag, 0
+			JZ		_notPrime
+
+			; Print the current prime
+			CALL	WriteDec
+
+			; Increment number of primes printed
+			MOV		EBX, numPrimesPrinted
+			INC		EBX
+			MOV		numPrimesPrinted, EBX
+			MOV		EDX, OFFSET outputSpacer
+			CALL	WriteString
+
+			; Determine if numPrimesPrinted % 10 is 0, if so, start a new line
+			PUSH	EAX
+			MOV		EAX, numPrimesPrinted
+			MOV		EDX, 0
+			MOV		EBX, 10
+			DIV		EBX
+			CMP		EDX, 0
+			JNZ		_notMultOfTen
+			CALL	Crlf
+
+			_notMultOfTen:
+				POP		EAX
+				INC		EAX
+				MOV		testIsPrimeFlag, 0
+				JMP		_endWhileNotPrime
+
+			_notPrime:
+				INC	EAX
+
+
+		_endWhileNotPrime:
+			LOOP _showPrimesLoop
+
 	_exitShowPrimes:
 	POP		EBP
 	RET		4
@@ -249,6 +300,9 @@ ShowPrimes ENDP
 IsPrime PROC
 	PUSH	EBP
 	MOV		EBP, ESP
+
+
+
 
 IsPrime ENDP
 
