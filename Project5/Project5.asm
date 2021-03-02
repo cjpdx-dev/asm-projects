@@ -12,7 +12,7 @@ TITLE Program Template     (template.asm)
 
 INCLUDE Irvine32.inc
 
-ARRAYSIZE		= 200
+ARRAYSIZE		= 6
 LO				= 10
 HI				= 29
 
@@ -26,8 +26,9 @@ intro4				BYTE	"So sit back, relax, and enjoy the medocrity of bubble sort!",0
 
 
 ; user prompt data
-sortedNumbersPrompt	BYTE	"Sorted numbers: ",0
-medianValuePrompt	BYTE	"Median value: ",0
+unsortedPrompt		BYTE	"Unsorted numbers: ",0
+sortedPrompt		BYTE	"Sorted numbers: ",0
+medianPrompt		BYTE	"Median value: ",0
 numberFreqPrompt	BYTE	"Frequency of values: ",0
 goodbyePrompt		BYTE	"Goodbye!",0
 
@@ -39,11 +40,6 @@ outputSpacer		BYTE	" ",0
 randArray			DWORD	ARRAYSIZE DUP(?)
 counts				DWORD	((HI - LO) + 1) DUP(?)
 
-; flag data for sortList and helper functions
-
-; output storage for sortList and helper functions
-
-; flag data for displayMedian and helper functions
 
 ; output storage for displayMedian and helper functions
 halfwayPoint		DWORD	?
@@ -52,6 +48,9 @@ arraySizeMod2		DWORD	?
 lowMiddleMost		DWORD	?
 highMiddleMost		DWORD	?
 medianValue			DWORD	?
+
+; flags
+; flag1				BYTE	"flag 1",0
 
 .code
 main PROC
@@ -70,6 +69,7 @@ main PROC
 	PUSH	HI
 	CALL	fillArray
 
+	PUSH	OFFSET unsortedPrompt
 	PUSH	OFFSET outputSpacer
 	PUSH	OFFSET randArray
 	PUSH	ARRAYSIZE
@@ -77,11 +77,24 @@ main PROC
 	CALL	displayList
 
 
-	; CALL	sortList
+	PUSH	OFFSET randArray
+	PUSH	ARRAYSIZE
+	PUSH	TYPE randArray
+	CALL	sortList
 
-	; CALL	displayList
 
-	; CALL	displayMedian
+	PUSH	OFFSET sortedPrompt
+	PUSH	OFFSET outputSpacer
+	PUSH	OFFSET randArray
+	PUSH	ARRAYSIZE
+	PUSH	TYPE randArray
+	CALL	displayList
+
+	PUSH	TYPE	randArray
+	PUSH	OFFSET medianPrompt
+	PUSH	OFFSET randArray
+	PUSH	ARRAYSIZE
+	CALL	displayMedian
 
 	; CALL	countList
 
@@ -152,11 +165,11 @@ Introduction ENDP
 ; Postconditions: None
 ;
 ; Receives:
-;		[ebp+24]	= mem offset randArray
-;		[ebp+20]	= const ARRAYSIZE
-;		[ebp+16]	= imm TYPE randArray
-;		[ebp+12]	= const LO
-;		[ebp+8]		= const HI
+;		[ebp+24]	= (mem) offset randArray
+;		[ebp+20]	= (const) ARRAYSIZE
+;		[ebp+16]	= (imm) TYPE randArray
+;		[ebp+12]	= (const) LO
+;		[ebp+8]		= (const) HI
 ;
 ; Returns: 
 ;		randArray
@@ -168,6 +181,8 @@ fillArray PROC
 
 	MOV		ECX, [EBP+20]
 	MOV		EDI, [EBP+24]
+
+	CALL	Randomize
 	
 	_fillArrayLoop:
 		MOV		EAX, [EBP+8]
@@ -193,62 +208,118 @@ fillArray ENDP
 ;----------------------------------------------------------------------------------------------------------------------
 ; Name: sortList
 ;
-; Description: 
+; Description: Sorts the random integers in randArray in accending order. Calls the exchangeElements procedure
 ;
 ; Preconditions: None
 ;
 ; Postconditions: None
 ;
 ; Receives:
-;	
-; Returns: None
+;		[ebp+16]	= (mem) OFFSET randArray
+;		[ebp+12]	= (const) ARRAYSIZE
+;		[ebp+8]		= TYPE randArray
+;
+; Returns:
+;		randArray
 ;
 ;----------------------------------------------------------------------------------------------------------------------
 sortList PROC
 	PUSH	EBP
 	MOV		EBP, ESP
+	PUSH	ESI
 
+	; Initialize the ECX counter for the outer loop = ARRAYSIZE - 1
+	
+	MOV		ECX, [EBP+12]	
+	DEC		ECX				; ECX = ARRAYSIZE - 1
+
+	_outerLoop:
+		PUSH	ECX						; Push the ECX of the outer loop to the stack
+
+		_innerLoop:
+			MOV		ESI, [EBP+16]
+
+			POP		EBX		
+			MOV		EAX, EBX			; EAX now holds the ECX value from the outer loop
+			PUSH	EBX					; push the outer ECX value back to the stack
+
+			SUB		EAX, ECX			; EAX now holds the currentIndex we want to compare
+
+			PUSH	EAX					; Store currentIndex on the stack
+
+			MOV		EAX, [EBP+8]		; EAX now holds the TYPE of randArray(4)
+			
+			POP		EBX					; pop currentIndex from stack
+			
+			MUL		EBX					; multiply currentIndex by TYPE randArray (4)
+
+			ADD		ESI, EAX			; after MUL, eax holds number of bytes to add to get to currentIndex's offset
+										; we add this to ESI to point ESI to currentIndex
+
+			MOV		EAX, [ESI]			; eax now holds value of currentIndex
+
+			ADD		ESI, [EBP+8]		; add the TYPE of randArray (4) to point the ESI to currentIndex + 1
+			MOV		EBX, [ESI]			; ebx now holds value of currentIndex + 1
+				
+			CMP		EAX, EBX			; Compare the value at currentIndex with the value at currentIndex + 1
+
+			JLE		_indexLessOrEqualToIndexPlusOne
+
+			
+			PUSH	[EBP+8]				; push TYPE of randArray to stack
+			PUSH	EAX
+			PUSH	EBX
+			PUSH	ESI					; Push ESI to stack - current ESI represents offset for currentIndex + 1
+			CALL	exchangeElements
+
+		_indexLessOrEqualToIndexPlusOne:
+		LOOP	_innerLoop
+		
+	POP		ECX							; retrieve the old _outerLoop ECX counter from the stack and store in ECX
+	LOOP	_outerLoop
+
+	POP		ESI
+	POP		EBP
+	RET		12
 sortList ENDP
-
-;----------------------------------------------------------------------------------------------------------------------
-; Name: sortListHelper
-;
-; Description: 
-;
-; Preconditions: None
-;
-; Postconditions: None
-;
-; Receives:
-;	
-; Returns: None
-;
-;----------------------------------------------------------------------------------------------------------------------
-sortListHelper PROC
-	PUSH	EBP
-	MOV		EBP, ESP
-
-sortListHelper ENDP
 
 
 ;----------------------------------------------------------------------------------------------------------------------
 ; Name: exchangeElements
 ;
-; Description: 
+; Description: Swaps the elements between the current index and current index + 1
 ;
 ; Preconditions: None
 ;
 ; Postconditions: None
 ;
 ; Receives:
+;		[ebp+8]		= (imm) ESI that represents OFFSET for currentIndex + 1
+;		[ebp+12]	= (imm) value of currentIndex + 1
+;		[ebp+16]	= (imm) value of currentIndex
+;		[ebp+20]	= (imm) TYPE of randArray
 ;	
-; Returns: None
+; Returns:
+;		randArray
 ;
 ;----------------------------------------------------------------------------------------------------------------------
 exchangeElements PROC
+
 	PUSH	EBP
 	MOV		EBP, ESP
+	PUSH	ESI
 
+	MOV		ESI, [EBP+8]
+	MOV		EBX, [EBP+16]
+	MOV		[ESI], EBX
+
+	SUB		ESI, [EBP+20]
+	MOV		EBX, [EBP+12]
+	MOV		[ESI], EBX
+
+	POP		ESI
+	POP		EBP
+	RET		16
 exchangeElements ENDP
 
 
@@ -262,6 +333,10 @@ exchangeElements ENDP
 ; Postconditions: None
 ;
 ; Receives:
+;		[ebp+20]	= imm TYPE for randArray (4)
+;		[ebp+16]	= OFFSET for medianPrompt
+;		[ebp+12]	= mem OFFSET randArray
+;		[ebp+8]		= const ARRAYSIZE
 ;	
 ; Returns: None
 ;
@@ -269,7 +344,69 @@ exchangeElements ENDP
 displayMedian PROC
 	PUSH	EBP
 	MOV		EBP, ESP
+	PUSH	ESI
 
+	CALL	Crlf
+	CALL	Crlf
+	MOV		EDX, [EBP+16]
+	CALL	WriteString
+
+
+	MOV		ESI, [EBP+12]			; set ESI to first element of randArray
+
+
+	; get the remainder of ARRAYSIZE / 2, then compare with 0
+	MOV		EAX, [EBP+8]
+	MOV		EDX, 0
+	MOV		EBX, 2
+	DIV		EBX			
+	CMP		EDX, 0
+
+	JE		_listHasEvenNumberOfElements
+			
+	; if ARRAYSIZE was odd, EAX now holds the middle index
+	MOV		EBX, [EBP+20]			; set EBX to TYPE value of randArray (4)
+	MUL		EBX						; EAX now holds number of bytes to offset ESI to reach median value
+
+	ADD		ESI, EAX				; ESI now points to median index
+	MOV		EAX, [ESI]				; EAX now holds median value
+	
+	; display the median value and exit the procedure
+	CALL	WriteDec
+	CALL	Crlf
+	JMP		_exitDisplayMedian
+
+
+	; if ARRAYSIZE was even, then EAX now holds the upper middle index
+	_listHasEvenNumberOfElements:
+	
+	; get the value at the upper-middle index
+	MOV		EBX, [EBP+20]			; set EBX to TYPE value of randArray (4)
+	MUL		EBX						; EAX now holds number of bytes to offset ESI to reach upper middle index
+
+	ADD		ESI, EAX				; ESI now points to upper middle index
+	MOV		EAX, [ESI]				; EAX now holds upper-middle index value
+
+	SUB		ESI, [EBP+20]			; subtract TYPE value of randArray (4) from ESI. ESI now points to lower middle index
+	MOV		EBX, [ESI]				; EBX now holds lower-middle index value
+
+	ADD		EAX, EBX				; EAX now holds summation of lower-middle index value and upper-middle index value
+	
+	MOV		EDX, 0
+	MOV		EBX, 2
+	DIV		EBX
+									; EAX now holds the quotient of the calculation (lower middle + upper middle) / 2
+									; EDX holds the remainder
+
+	PUSH
+	
+	CALL	WriteDec
+	CALL	Crlf
+
+	_exitDisplayMedian:
+	POP		ESI
+	POP		EBP
+	RET		12
 displayMedian ENDP
 
 
@@ -283,6 +420,7 @@ displayMedian ENDP
 ; Postconditions: None
 ;
 ; Receives:
+;		[ebp+24]	= OFFSET for user prompt
 ;		[ebp+20]	= OFFSET outputSpacer
 ; 		[ebp+16]	= OFFSET randArray
 ;		[ebp+12]	= LENGTHOF randArray
@@ -300,20 +438,28 @@ displayList PROC
 	
 	MOV		EBX, 0			; counter for knowning when to start a new display line
 	
+	
+
+	CALL	Crlf			; create an empty line for formatting
+	MOV		EDX, [ebp+24]
+	CALL	WriteString
+	CALL	Crlf
+	CALL	Crlf
+
 	MOV		EDX, [EBP+20]	; offset for outputSpacer for between numbers
 
 	_displayList:
 		
 		; check the current display counter
 		CMP		EBX, 20
-		JNE		_writeDec
+		JNE		_skipToWriteDec
 		
 		; if the display counter equals 20, start a new line and reset the display counter
 		CALL	Crlf
 		MOV		EBX, 0
 
 		; get the integer from randArray, write it and the formatting space, increment the source index for the array, and increment the display counter, then loop if ECX > 0
-		_writeDec:
+		_skipToWriteDec:
 			MOV		EAX, [ESI]
 			CALL	WriteDec
 			CALL	WriteString
@@ -321,9 +467,11 @@ displayList PROC
 			INC		EBX
 			LOOP	_displayList
 
+	CALL	Crlf			; for fomatting
+
 	POP		ESI
 	POP		EBP
-	RET		16
+	RET		20
 displayList ENDP
 
 
