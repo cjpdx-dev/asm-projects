@@ -4,7 +4,7 @@ TITLE Program Template     (template.asm)
 ; Last Modified: 2/28/2021
 ; OSU email address: jacobsc2@oregonstate.edu
 ; Course number/section:   CS271 Section 400
-; Project Number: 5               Due Date: 2/28/2021
+; Project Number: 5               Due Date: 2/28/2021	Submitted: 3/1/2021 (1 Grace Day)
 ; Description:	A program that populates an array of a constant size with random numbers, sorts those numbers, finds
 ;				the median of the array, and then creates another array that represents the frequency of each number in the
 ;				random number array.
@@ -12,7 +12,7 @@ TITLE Program Template     (template.asm)
 
 INCLUDE Irvine32.inc
 
-ARRAYSIZE		= 6
+ARRAYSIZE		= 200
 LO				= 10
 HI				= 29
 
@@ -39,9 +39,6 @@ outputSpacer		BYTE	" ",0
 ; main data structures
 randArray			DWORD	ARRAYSIZE DUP(?)
 counts				DWORD	((HI - LO) + 1) DUP(?)
-
-; flags
-flag1				BYTE	"flag1",0
 
 
 .code
@@ -138,26 +135,31 @@ introduction PROC
 	PUSH	EBP
 	MOV		EBP, ESP
 
+	; Write intro1
 	MOV		EDX, [EBP + 20]
 	CALL	WriteString
 	CALL	Crlf
 	CALL	Crlf
 
+	; Write intro2
 	MOV		EDX, [EBP + 16]
 	CALL	WriteString
 	CALL	Crlf
 	CALL	Crlf
 
+	; Write intro3
 	MOV		EDX, [EBP + 12]
 	CALL	WriteString
 	CALL	Crlf
 	CALL	Crlf
 
+	; Write intro4
 	MOV		EDX, [EBP + 8]
 	CALL	WriteString
 	CALL	Crlf
 	CALL	Crlf
 
+	; Exit proc
 	POP		EBP
 	RET		16
 Introduction ENDP
@@ -188,26 +190,31 @@ fillArray PROC
 	PUSH	EBP
 	MOV		EBP, ESP
 
+	; Set initial counter for _fillArrayLoop
 	MOV		ECX, [EBP+20]
-	MOV		EDI, [EBP+24]
+	
+	; Set EDI to point to the 0th index of randArray
+	MOV		EDI, [EBP+24]		
 
+	; Generate the random seed for call to RandomRange
 	CALL	Randomize
 	
 	_fillArrayLoop:
 		MOV		EAX, [EBP+8]
 		INC		EAX
-		CALL	RandomRange
+		CALL	RandomRange					; Get a random number with a maximum value of the HI const and store in EAX
 
-		CMP		EAX, [EBP+12]
+		
+		CMP		EAX, [EBP+12]				
 		JGE		_valueGreaterOrEqualtoLow
 
-		ADD		EAX, [EBP+12]
+		ADD		EAX, [EBP+12]				; If random number in EAX is less than 10, add 10 to the value in EAX
 
 		_valueGreaterOrEqualtoLow:
-			MOV		[EDI], EAX
-			ADD		EDI, [EBP+16]
+			MOV		[EDI], EAX				; Store the new random number in the index where EDI currently points to
+			ADD		EDI, [EBP+16]			; Increment the EDI by TYPE randArray (4)
 
-			LOOP	_fillArrayLoop
+			LOOP	_fillArrayLoop			; Repeat the loop
 
 	POP		EBP
 	RET		20
@@ -221,7 +228,7 @@ fillArray ENDP
 ;
 ; Preconditions: None
 ;
-; Postconditions: None
+; Postconditions: integers stored in randArray are now sorted
 ;
 ; Receives:
 ;		[ebp+16]	= (mem) OFFSET randArray
@@ -240,17 +247,19 @@ sortList PROC
 	; Initialize the ECX counter for the outer loop = ARRAYSIZE - 1
 	
 	MOV		ECX, [EBP+12]	
-	DEC		ECX				; ECX = ARRAYSIZE - 1
+	DEC		ECX
 
+	; Begin Outer loop
 	_outerLoop:
 		PUSH	ECX						; Push the ECX of the outer loop to the stack
 
+		; Begin Inner loop
 		_innerLoop:
-			MOV		ESI, [EBP+16]
+			MOV		ESI, [EBP+16]		; Set the ESI to point to the 0th index of randArray
 
 			POP		EBX		
 			MOV		EAX, EBX			; EAX now holds the ECX value from the outer loop
-			PUSH	EBX					; push the outer ECX value back to the stack
+			PUSH	EBX					; Push the outer ECX value back to the stack
 
 			SUB		EAX, ECX			; EAX now holds the currentIndex we want to compare
 
@@ -258,24 +267,24 @@ sortList PROC
 
 			MOV		EAX, [EBP+8]		; EAX now holds the TYPE of randArray(4)
 			
-			POP		EBX					; pop currentIndex from stack
+			POP		EBX					; Pop currentIndex from stack
 			
-			MUL		EBX					; multiply currentIndex by TYPE randArray (4)
+			MUL		EBX					; Multiply currentIndex by TYPE randArray (4)
 
-			ADD		ESI, EAX			; after MUL, eax holds number of bytes to add to get to currentIndex's offset
+			ADD		ESI, EAX			; After MUL, eax holds number of bytes to add to get to currentIndex's offset
 										; we add this to ESI to point ESI to currentIndex
 
-			MOV		EAX, [ESI]			; eax now holds value of currentIndex
+			MOV		EAX, [ESI]			; EAX now holds value of currentIndex
 
-			ADD		ESI, [EBP+8]		; add the TYPE of randArray (4) to point the ESI to currentIndex + 1
-			MOV		EBX, [ESI]			; ebx now holds value of currentIndex + 1
+			ADD		ESI, [EBP+8]		; Add the TYPE of randArray (4) to point the ESI to currentIndex + 1
+			MOV		EBX, [ESI]			; EBX now holds value of currentIndex + 1
 				
 			CMP		EAX, EBX			; Compare the value at currentIndex with the value at currentIndex + 1
 
 			JLE		_indexLessOrEqualToIndexPlusOne
 
 			
-			PUSH	[EBP+8]				; push TYPE of randArray to stack
+			PUSH	[EBP+8]				; Push TYPE of randArray to stack
 			PUSH	EAX
 			PUSH	EBX
 			PUSH	ESI					; Push ESI to stack - current ESI represents offset for currentIndex + 1
@@ -287,6 +296,7 @@ sortList PROC
 	POP		ECX							; retrieve the old _outerLoop ECX counter from the stack and store in ECX
 	LOOP	_outerLoop
 
+	; exit the procedure
 	POP		ESI
 	POP		EBP
 	RET		12
@@ -318,14 +328,17 @@ exchangeElements PROC
 	MOV		EBP, ESP
 	PUSH	ESI
 
-	MOV		ESI, [EBP+8]
-	MOV		EBX, [EBP+16]
-	MOV		[ESI], EBX
+	; Set currentIndex + 1 = currentIndex
+	MOV		ESI, [EBP+8]				
+	MOV		EBX, [EBP+16]				
+	MOV		[ESI], EBX					
 
-	SUB		ESI, [EBP+20]
+	; Set currentIndex = currentIndex + 1
+	SUB		ESI, [EBP+20]				
 	MOV		EBX, [EBP+12]
 	MOV		[ESI], EBX
 
+	; exit procedure
 	POP		ESI
 	POP		EBP
 	RET		16
@@ -361,11 +374,11 @@ displayMedian PROC
 	MOV		EDX, [EBP+16]
 	CALL	WriteString
 
-	; set ESI to first element of randArray
+	; Set ESI to first element of randArray
 	MOV		ESI, [EBP+12]			
 
 
-	; get the remainder of ARRAYSIZE / 2, then compare with 0
+	; Get the remainder of ARRAYSIZE / 2, then compare with 0
 	MOV		EAX, [EBP+8]
 	MOV		EDX, 0
 	MOV		EBX, 2
@@ -374,9 +387,9 @@ displayMedian PROC
 
 	JE		_listHasEvenNumberOfElements
 			
-	; get the median of an odd set of numbers
+	; Get the median of an odd set of numbers
 
-	; if ARRAYSIZE was odd, EAX now holds the middle index
+	; If ARRAYSIZE was odd, EAX now holds the middle index
 
 	MOV		EBX, [EBP+20]			; set EBX to TYPE value of randArray (4)
 	MUL		EBX						; EAX now holds number of bytes to offset ESI to reach median value
@@ -385,23 +398,23 @@ displayMedian PROC
 	ADD		ESI, EAX				; ESI now points to median index
 	MOV		EAX, [ESI]				; EAX now holds median value
 	
-	; display the median value and exit the procedure
+	; Display the median value and exit the procedure
 	CALL	WriteDec
 	CALL	Crlf
 	JMP		_exitDisplayMedian
 
 
-	; get the median for an even set of numbers
+	; Get the median for an even set of numbers
 	_listHasEvenNumberOfElements:
 
-									; if ARRAYSIZE was even, then EAX now holds the upper middle index
-	MOV		EBX, [EBP+20]			; set EBX to TYPE value of randArray (4)
+									; If ARRAYSIZE was even, then EAX now holds the upper middle index
+	MOV		EBX, [EBP+20]			; Set EBX to TYPE value of randArray (4)
 	MUL		EBX						; EAX now holds number of bytes to offset ESI to reach upper middle index
 
 	ADD		ESI, EAX				; ESI now points to upper middle index
 	MOV		EAX, [ESI]				; EAX now holds upper-middle index value
 
-	SUB		ESI, [EBP+20]			; subtract TYPE value of randArray (4) from ESI. ESI now points to lower middle index
+	SUB		ESI, [EBP+20]			; Subtract TYPE value of randArray (4) from ESI. ESI now points to lower middle index
 	MOV		EBX, [ESI]				; EBX now holds lower-middle index value
 
 	ADD		EAX, EBX				; EAX now holds summation of lower-middle index value and upper-middle index value
@@ -411,21 +424,22 @@ displayMedian PROC
 	DIV		EBX						; EAX now holds the quotient of the calculation (lower middle + upper middle) / 2
 									; and EDX holds the remainder of that calculation
 									
-	CMP		EDX, 0					; compare EDX with 0
+	CMP		EDX, 0					; Compare EDX with 0
 	JNE		_medianNotAWholeNumber					
 	
-	CALL	WriteDec				; if EDX is 0, then the median is a whole number and we can just display EAX as is
+	CALL	WriteDec				; If EDX is 0, then the median is a whole number and we can just display EAX as is
 	CALL	Crlf
 	JMP		_exitDisplayMedian
 	
 
-	_medianNotAWholeNumber:			; if EDX was not 0, then the median is fractional (EAX + .5) and we must use the 
+	_medianNotAWholeNumber:			; If EDX was not 0, then the median is fractional (EAX + .5) and we must use the 
 									; round half up rule
 
-	INC		EAX						; so increment EAX and then display that value as our estimated median
+	INC		EAX						; So increment EAX and then display that value as our estimated median
 	CALL	WriteDec
 	CALL	Crlf
 
+	; exit procedure
 	_exitDisplayMedian:
 	POP		ESI
 	POP		EBP
@@ -436,18 +450,18 @@ displayMedian ENDP
 ;----------------------------------------------------------------------------------------------------------------------
 ; Name: displayList
 ;
-; Description: 
+; Description: Displays an array of positive decimal integers
 ;
-; Preconditions: None
+; Preconditions: Passed array has only positive unsigned decimal numbers.
 ;
 ; Postconditions: None
 ;
 ; Receives:
-;		[ebp+24]	= OFFSET for user prompt
+;		[ebp+24]	= OFFSET passedUserPrompt
 ;		[ebp+20]	= OFFSET outputSpacer
-; 		[ebp+16]	= OFFSET randArray
-;		[ebp+12]	= LENGTHOF randArray
-;		[ebp+8]		= TYPE randArray
+; 		[ebp+16]	= OFFSET passedArray
+;		[ebp+12]	= LENGTHOF passedArray
+;		[ebp+8]		= TYPE passedArray
 ;	
 ; Returns: None
 ;----------------------------------------------------------------------------------------------------------------------
@@ -492,6 +506,7 @@ displayList PROC
 
 	CALL	Crlf			; for fomatting
 
+	; exit procedure
 	POP		ESI
 	POP		EBP
 	RET		20
@@ -501,9 +516,10 @@ displayList ENDP
 ;----------------------------------------------------------------------------------------------------------------------
 ; Name: countList
 ;
-; Description: 
+; Description: Populates an array named counts. Each index in the counts array represents the frequency of each number
+; found in the randArray
 ;
-; Preconditions: None
+; Preconditions: randArray has been populated with only positive unsigned decimal numbers.
 ;
 ; Postconditions: None
 ;
@@ -518,7 +534,7 @@ displayList ENDP
 ;		[ebp+8]			= LO
 ;	
 ; Returns:
-;		mem counts
+;		counts
 ;
 ;----------------------------------------------------------------------------------------------------------------------
 countList PROC
@@ -527,6 +543,8 @@ countList PROC
 	PUSH	ESI
 	
 	MOV		ECX, [EBP+32]		; init outerLoop ECX to LENGTHOF randArray
+	
+	; Begin outer loop
 	_outerLoop:
 		
 		PUSH	ECX				; Push ECX to Stack
@@ -542,49 +560,51 @@ countList PROC
 		MOV		EAX, [ESI]		; EAX now holds the value at randArray[ecx-1]
 		PUSH	EAX				; Push EAX (randArray[ecx-1]) to stack
 		
-		MOV		EAX, [EBP+12]	; set EAX to the starting "current" number, which is always the HI constant value
+		MOV		EAX, [EBP+12]	; Set EAX to the starting "current" number, which is always the HI constant value
 
 		MOV		EBX, [EBP+12]
 		SUB		EBX, [EBP+8]
 		INC		EBX
-		MOV		ECX, EBX		; subtract HI from LO, INC by 1 and store this value in ECX as our _innerLoop counter
+		MOV		ECX, EBX		; Subtract HI from LO, INC by 1 and store this value in ECX as our _innerLoop counter
 
+		; Begin inner loop
 		_innerLoop:
 			POP		EBX			; Pop from stack - EBX holds num (randArray[ecx-1])
-			CMP		EAX, EBX	; compare with EAX (EAX holds the current number which starts at the HI constant value)
+			CMP		EAX, EBX	; Compare with EAX (EAX holds the current number which starts at the HI constant value)
 			PUSH	EBX
 
 			JNZ		_currentDoesNotEqualNum
 
-				MOV		ESI, [EBP+24]	; set ESI to 0th element of counts
+				MOV		ESI, [EBP+24]	; Set ESI to 0th element of counts
 				
-				MOV		EBX, ECX		; set EBX to current ECX
+				MOV		EBX, ECX		; Set EBX to current ECX
 				DEC		EBX				; EBX now holds the index of counts we need to increment
 				
 				MOV		EAX, [EBP+16]	; Set EAX to TYPE of counts (4)
 				MUL		EBX				; EAX now holds the number of bytes to add to ESI to get value at the index we need to increment
 
-				ADD		ESI, EAX		; edit the ESI by adding EAX
+				ADD		ESI, EAX		; Edit the ESI by adding EAX
 				MOV		EAX, [ESI]		; EAX now holds the value we need to increment
 				INC		EAX				; Increment EAX value
 
 				PUSH	EDI				; Save EDI on Stack
 				MOV		EDI, ESI		; Set the EDI to the previous ESI
-				MOV		[EDI], EAX		; append the newly incremented EAX value to the index where the old value was
+				MOV		[EDI], EAX		; Append the newly incremented EAX value to the index where the old value was
 				POP		EDI				; Restore EDI
 				
-				JMP		_breakInnerLoop	; break out of the inner loop	
+				JMP		_breakInnerLoop	; Break out of the inner loop	
 			
 			_currentDoesNotEqualNum:
-			DEC		EAX					; decrement EAX (current number) and repeat loop
+			DEC		EAX					; Decrement EAX (current number) and repeat loop
 		
 		LOOP _innerLoop
 
 		_breakInnerLoop:
-		POP		EBX						; keep stack alligned!
-		POP		ECX						; restore outerLoop's counter
+		POP		EBX						; Keep stack alligned!
+		POP		ECX						; Restore outerLoop's counter
 	LOOP _outerLoop
 
+	; end procedure
 	POP		ESI
 	POP		EBP
 	RET		32
