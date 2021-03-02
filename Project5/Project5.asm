@@ -40,17 +40,9 @@ outputSpacer		BYTE	" ",0
 randArray			DWORD	ARRAYSIZE DUP(?)
 counts				DWORD	((HI - LO) + 1) DUP(?)
 
-
-; output storage for displayMedian and helper functions
-halfwayPoint		DWORD	?
-arraySizeMod2		DWORD	?
-
-lowMiddleMost		DWORD	?
-highMiddleMost		DWORD	?
-medianValue			DWORD	?
-
 ; flags
-; flag1				BYTE	"flag 1",0
+flag1				BYTE	"flag1",0
+
 
 .code
 main PROC
@@ -90,15 +82,32 @@ main PROC
 	PUSH	TYPE randArray
 	CALL	displayList
 
-	PUSH	TYPE	randArray
+
+	PUSH	TYPE randArray
 	PUSH	OFFSET medianPrompt
 	PUSH	OFFSET randArray
 	PUSH	ARRAYSIZE
 	CALL	displayMedian
 
-	; CALL	countList
 
-	; CALL	displayList
+	PUSH	OFFSET randArray
+	PUSH	LENGTHOF randArray
+	PUSH	TYPE randArray
+	PUSH	OFFSET counts
+	PUSH	LENGTHOF counts
+	PUSH	TYPE counts
+	PUSH	HI
+	PUSH	LO
+	CALL	countList
+
+
+	PUSH	OFFSET numberFreqPrompt
+	PUSH	OFFSET outputSpacer
+	PUSH	OFFSET counts
+	PUSH	LENGTHOF counts
+	PUSH	TYPE counts
+	CALL	displayList
+
 
 	PUSH	OFFSET goodbyePrompt
 	CALL	Goodbye
@@ -326,7 +335,8 @@ exchangeElements ENDP
 ;----------------------------------------------------------------------------------------------------------------------
 ; Name: displayMedian
 ;
-; Description: 
+; Description: displays the median value for the set of numbers in randArray. For any non-fractional median value
+; we use the "round half up" rule.
 ;
 ; Preconditions: None
 ;
@@ -351,8 +361,8 @@ displayMedian PROC
 	MOV		EDX, [EBP+16]
 	CALL	WriteString
 
-
-	MOV		ESI, [EBP+12]			; set ESI to first element of randArray
+	; set ESI to first element of randArray
+	MOV		ESI, [EBP+12]			
 
 
 	; get the remainder of ARRAYSIZE / 2, then compare with 0
@@ -364,9 +374,13 @@ displayMedian PROC
 
 	JE		_listHasEvenNumberOfElements
 			
+	; get the median of an odd set of numbers
+
 	; if ARRAYSIZE was odd, EAX now holds the middle index
+
 	MOV		EBX, [EBP+20]			; set EBX to TYPE value of randArray (4)
 	MUL		EBX						; EAX now holds number of bytes to offset ESI to reach median value
+
 
 	ADD		ESI, EAX				; ESI now points to median index
 	MOV		EAX, [ESI]				; EAX now holds median value
@@ -377,10 +391,10 @@ displayMedian PROC
 	JMP		_exitDisplayMedian
 
 
-	; if ARRAYSIZE was even, then EAX now holds the upper middle index
+	; get the median for an even set of numbers
 	_listHasEvenNumberOfElements:
-	
-	; get the value at the upper-middle index
+
+									; if ARRAYSIZE was even, then EAX now holds the upper middle index
 	MOV		EBX, [EBP+20]			; set EBX to TYPE value of randArray (4)
 	MUL		EBX						; EAX now holds number of bytes to offset ESI to reach upper middle index
 
@@ -394,19 +408,28 @@ displayMedian PROC
 	
 	MOV		EDX, 0
 	MOV		EBX, 2
-	DIV		EBX
-									; EAX now holds the quotient of the calculation (lower middle + upper middle) / 2
-									; EDX holds the remainder
-
-	PUSH
+	DIV		EBX						; EAX now holds the quotient of the calculation (lower middle + upper middle) / 2
+									; and EDX holds the remainder of that calculation
+									
+	CMP		EDX, 0					; compare EDX with 0
+	JNE		_medianNotAWholeNumber					
 	
+	CALL	WriteDec				; if EDX is 0, then the median is a whole number and we can just display EAX as is
+	CALL	Crlf
+	JMP		_exitDisplayMedian
+	
+
+	_medianNotAWholeNumber:			; if EDX was not 0, then the median is fractional (EAX + .5) and we must use the 
+									; round half up rule
+
+	INC		EAX						; so increment EAX and then display that value as our estimated median
 	CALL	WriteDec
 	CALL	Crlf
 
 	_exitDisplayMedian:
 	POP		ESI
 	POP		EBP
-	RET		12
+	RET		16
 displayMedian ENDP
 
 
@@ -485,14 +508,86 @@ displayList ENDP
 ; Postconditions: None
 ;
 ; Receives:
+;		[ebp+36]		= OFFSET randArray
+;		[ebp+32]		= LENGTHOF randArray
+;		[ebp+28]		= TYPE randArray
+;		[ebp+24]		= OFFSET counts
+;		[ebp+20]		= LENGTHOF counts
+;		[ebp+16]		= TYPE counts
+;		[ebp+12]		= HI
+;		[ebp+8]			= LO
 ;	
-; Returns: None
+; Returns:
+;		mem counts
 ;
 ;----------------------------------------------------------------------------------------------------------------------
 countList PROC
 	PUSH	EBP
 	MOV		EBP, ESP
+	PUSH	ESI
+	
+	MOV		ECX, [EBP+32]		; init outerLoop ECX to LENGTHOF randArray
+	_outerLoop:
+		
+		PUSH	ECX				; Push ECX to Stack
+		MOV		ESI, [EBP+36]	; set ESI to 0th element of randArray
 
+		MOV		EBX, ECX
+		DEC		EBX				; EBX now holds the index for the value in randArray we want to use 
+
+		MOV		EAX, [EBP+28]	; EAX now holds the TYPE of randArray (4)
+		MUL		EBX
+
+		ADD		ESI, EAX		; EAX now holds the number of bytes to add to ESI to point ESi to the index for the value we want
+		MOV		EAX, [ESI]		; EAX now holds the value at randArray[ecx-1]
+		PUSH	EAX				; Push EAX (randArray[ecx-1]) to stack
+		
+		MOV		EAX, [EBP+12]	; set EAX to the starting "current" number, which is always the HI constant value
+
+		MOV		EBX, [EBP+12]
+		SUB		EBX, [EBP+8]
+		INC		EBX
+		MOV		ECX, EBX		; subtract HI from LO, INC by 1 and store this value in ECX as our _innerLoop counter
+
+		_innerLoop:
+			POP		EBX			; Pop from stack - EBX holds num (randArray[ecx-1])
+			CMP		EAX, EBX	; compare with EAX (EAX holds the current number which starts at the HI constant value)
+			PUSH	EBX
+
+			JNZ		_currentDoesNotEqualNum
+
+				MOV		ESI, [EBP+24]	; set ESI to 0th element of counts
+				
+				MOV		EBX, ECX		; set EBX to current ECX
+				DEC		EBX				; EBX now holds the index of counts we need to increment
+				
+				MOV		EAX, [EBP+16]	; Set EAX to TYPE of counts (4)
+				MUL		EBX				; EAX now holds the number of bytes to add to ESI to get value at the index we need to increment
+
+				ADD		ESI, EAX		; edit the ESI by adding EAX
+				MOV		EAX, [ESI]		; EAX now holds the value we need to increment
+				INC		EAX				; Increment EAX value
+
+				PUSH	EDI				; Save EDI on Stack
+				MOV		EDI, ESI		; Set the EDI to the previous ESI
+				MOV		[EDI], EAX		; append the newly incremented EAX value to the index where the old value was
+				POP		EDI				; Restore EDI
+				
+				JMP		_breakInnerLoop	; break out of the inner loop	
+			
+			_currentDoesNotEqualNum:
+			DEC		EAX					; decrement EAX (current number) and repeat loop
+		
+		LOOP _innerLoop
+
+		_breakInnerLoop:
+		POP		EBX						; keep stack alligned!
+		POP		ECX						; restore outerLoop's counter
+	LOOP _outerLoop
+
+	POP		ESI
+	POP		EBP
+	RET		32
 countList ENDP
 
 
