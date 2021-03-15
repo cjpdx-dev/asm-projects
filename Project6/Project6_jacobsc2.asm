@@ -15,7 +15,7 @@ INCLUDE Irvine32.inc
 
 
 ; CONSTANTS
-MAX_INPUT_SIZE = 12
+MAX_INPUT_SIZE = 13
 VALUE_STORAGE_SIZE = 10
 
 
@@ -104,8 +104,8 @@ exampleInputPrompt		BYTE	"Example input: '-157' ... '+293' ... '3492'",0
 ; ReadVal data
 errorPromptNotInt		BYTE	"The input failed because your input included a non-integer value or invalid symbol. Please try again.",0
 errorPromptTooBig		BYTE	"The value you input was too large. Please try again.",0
-readValOutputArr		SDWORD	MAX_INPUT_SIZE DUP(?)
-sdwordValueArr			SDWORD	VALUE_STORAGE_SIZE DUP(?)
+readValOutputArr		SDWORD	VALUE_STORAGE_SIZE DUP(?)
+convertedValueArr		SDWORD	MAX_INPUT_SIZE DUP(?)
 
 ; ReadVal Status Flags
 signFlag 				DWORD	0 ; False
@@ -114,7 +114,7 @@ errorFlag				DWORD	0 ; False
 
 ; mGetString data
 inputPrompt				BYTE	"Input number: ",0
-count					DWORD	VALUE_STORAGE_SIZE
+count					DWORD	MAX_INPUT_SIZE
 mGetStrInputArr			BYTE	MAX_INPUT_SIZE DUP(?)
 numBytesRead			DWORD	?
 
@@ -129,10 +129,8 @@ averageLabel			BYTE	"Average: ",0
 
 
 ; Debug Flags
-enteredReadValFlag		BYTE	"Called PROC ReadVal",0
-exitedReadValFlag		BYTE	"Exited PROC ReadVal",0
-enteredmGetStringFlag	BYTE	"Invoked MACRO mGetString",0
-exitedMGetStringFlag	BYTE	"Left MACRO mGetString",0
+flag1					BYTE	"flag1",0
+invalidInputFlag		BYTE	"invalidInputFlag",0
 
 
 .code
@@ -162,7 +160,7 @@ main PROC
 
 		; ReadVal outputs
 		PUSH	OFFSET readValOutputArr		; [ebp+28]
-		PUSH	OFFSET sdwordValueArr		; [ebp+24]
+		PUSH	OFFSET convertedValueArr	; [ebp+24]
 		
 		; mGetString inputs
 		PUSH	OFFSET inputPrompt			; [ebp+20]
@@ -176,26 +174,6 @@ main PROC
 		; Call ReadVal
 		CALL	ReadVal
 
-		CALL	Crlf
-		; *********************** TEST **************************
-		MOV		ESI, OFFSET sdwordValueArr
-		PUSH	ECX
-		MOV		ECX, COUNT
-		CLD
-		_testLoop:
-		MOV		EAX, 0
-		LODSD
-		CALL	Crlf
-		CALL	WriteInt
-		CALL	Crlf
-
-		LOOP	_testLoop
-		
-		MOV		EDX, OFFSET exitedReadValFlag
-		; *********************** TEST **************************
-		CALL	Crlf
-
-		POP		ECX
 	LOOP _readValLoop
 
 	
@@ -203,7 +181,7 @@ main PROC
 	MOV		ECX, VALUE_STORAGE_SIZE
 	_writeValLoop:							
 	
-		PUSH 	OFFSET sdwordValueArr		; WriteVal inputs
+		PUSH 	OFFSET convertedValueArr	; WriteVal inputs
 		PUSH	OFFSET displayStrArray		; mDisplayString inputs
 		CALL	WriteVal
 		
@@ -212,7 +190,7 @@ main PROC
 	LOOP _writeValLoop
 	
 	
-	PUSH 	sdwordvalueArr					; DisplayCalculations input
+	PUSH 	OFFSET convertedValueArr		; DisplayCalculations input
 	CALL	DisplayCalculations
 	
 	
@@ -315,6 +293,7 @@ ReadVal PROC
 	PUSH 	EBX
 	PUSH	EDX
 	PUSH	ESI
+	PUSH	EDI
 
 
 	; Invoke macro mGetString 
@@ -347,7 +326,8 @@ ReadVal PROC
 
 	; Clear errorFlag
 	MOV		ESI, [ebp+48]
-	MOV		[ESI], 0
+	MOV		EBX, 0
+	MOV		[ESI], EBX
 	
 	
 	; Setup ESI and ECX for _validateLoop
@@ -357,6 +337,10 @@ ReadVal PROC
 	MOV		ECX, [EBX]				; ECX = numBytesRead
 	_validateLoop:
 		LODSD
+
+		MOV		EDX, OFFSET flag1
+		CALL	WriteString
+		CALL	Crlf
 	
 		CMP		EAX, 0				; check for value less than 0
 		JL		_checkForPosSign
@@ -372,45 +356,91 @@ ReadVal PROC
 		JNE		_checkForNeg
 
 		MOV		EBX, [ebp+44]		; check signFlag
-		CMP		[EBX], 1
+		CMP		DWORD PTR [EBX], 1
 		JE		_abortReadVal		; if set, jump to _abortReadVal (means we already encountered a sign at the first index)
-								
-		MOV		[ESI], 0			; else, assign 0 to current ESI, and continue
-		JMP		_continue
 		
+		MOV		EDI, [ebp+24]		; else, assign 0 to first index of array, and continue	
+		MOV		SDWORD PTR [EDI], 0
+		JMP		_continue
 		
 		_checkForNeg:
 		CMP		EAX, -3
 		JNE		_abortReadVal		; value at ESI is not a -, +, or valid integer, so abort
 		
 		MOV 	EBX, [ebp+44]
-		CMP		[EBX], 1
+		CMP		DWORD PTR [EBX], 1
 		JE		_abortReadVal		; if set, jump to _abortReadVal
-				
-		MOV		EBX, [ebp+40]		; else, set negFlag, assign 0 to current ESI, and continue
-		MOV		[EBX], 1
-		MOV		[ESI], 0
+			
+		MOV		EDI, [ebp+40]		; else, set negFlag, assign 0 to current ESI, and continue		
+		MOV		DWORD PTR [EDI], 1
+		
+		MOV		EDI, [ebp+24]
+		MOV		SDWORD PTR [EDI], 0
 		
 		
 	_continue:
-		MOV		EBX, [ebp+44]		; set the sign flag (we do this first on the first loop and then if we find any more signs, we abort)
-		MOV		[EBX], 1			
+		PUSH	ESI					; set the sign flag (we do this first on the first loop and then if we find any more signs, we abort)
+		MOV		ESI, [ebp+44]
+		MOV		EBX, 1
+		MOV		[ESI], EBX
+		POP		ESI				
 	
 	LOOP	_validateLoop
 
-	
+	; Generate value to store in readValOutputArr
+
+	; Check to see if neg flag was set, if it was, IMUL generated value by -1
+
+	; Check to see if overflow occured, jump to abortReadVal if it did
+
+	; Save value to readValOutputArr (need to figure out how, pass value to stack based on where we are
+	; in PROC main loop? Or just have a seperate memory space for numWritten?
+
+	; clean up and exit
+
+	JMP		_cleanUp
+
 	; invalid input found, so abort the ReadVal procedure without writing to readValOutputArr
 	_abortReadVal:
-	MOV		ESI, [ebp+48]			; Set Error Flag to 1 (True)
-	MOV		[ESI], 1
+	MOV		EDX, OFFSET invalidInputFlag
+	CALL	WriteString
+	CALL	Crlf
+
+	MOV		ESI, [ebp+48]			; Set the errorFlag
+	MOV		DWORD PTR [ESI], 1
+
+	_cleanUp:
+
+		MOV		ESI, [ebp+44]			; Clear the signFlag
+		MOV		DWORD PTR [ESI], 0
 	
-	MOV		ESI, [ebp+44]			; Clear sign flag
-	MOV		[ESI], 0
-	
-	MOV		ESI, [ebp+40]			; Clear neg flag
-	MOV		[ESI], 0
+		MOV		ESI, [ebp+40]			; Clear negFlag
+		MOV		DWORD PTR [ESI], 0
+
+
+
+		MOV		ECX, MAX_INPUT_SIZE
+		MOV		ESI, OFFSET convertedValueArr
+		_testLoop1:
+		MOV		EAX, 0
+		MOV		EAX, [ESI]
+		CALL	Crlf
+		CALL	WriteInt
+		CALL	Crlf
+		ADD		ESI, 4
+
+		LOOP _testLoop1
+
+		
+		MOV		ECX, MAX_INPUT_SIZE
+		MOV		ESI, [ebp+24]
+		_resetConvertedValueArr:		
+		MOV		SDWORD PTR [ESI], 0
+		ADD		ESI, 4
+		LOOP	_resetConvertedValueArr
 
 	; Restore registers (ECX, EBX, EDX, ESI)
+	POP		EDI
 	POP		ESI
 	POP		EDX
 	POP		EBX
