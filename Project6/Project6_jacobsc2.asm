@@ -43,7 +43,8 @@ mGetString	MACRO	promptRef, countVal, mGetStrInputArrRef, bytesReadRef
 	PUSH	EBX
 	PUSH	ECX
 	PUSH	EDX
-	
+	PUSH	ESI
+
 	; display the input prompt
 	CALL	Crlf
 	MOV		EDX, promptRef
@@ -55,10 +56,11 @@ mGetString	MACRO	promptRef, countVal, mGetStrInputArrRef, bytesReadRef
 	CALL	ReadString
 
 	; store bytes read
-	MOV		EBX, bytesReadRef
-	MOV		[EBX], EAX
+	MOV		ESI, bytesReadRef
+	MOV		[ESI], EAX
 	
 	; restore stack / registers
+	POP	ESI
 	POP EDX
 	POP	ECX
 	POP EBX
@@ -102,12 +104,13 @@ exampleInputPrompt		BYTE	"Example input: '-157' ... '+293' ... '3492'",0
 ; ReadVal data
 errorPromptNotInt		BYTE	"The input failed because your input included a non-integer value or invalid symbol. Please try again.",0
 errorPromptTooBig		BYTE	"The value you input was too large. Please try again.",0
-convertedArr			SDWORD	MAX_INPUT_SIZE DUP(?)
+readValOutputArr		SDWORD	MAX_INPUT_SIZE DUP(?)
 sdwordValueArr			SDWORD	VALUE_STORAGE_SIZE DUP(?)
 
 ; ReadVal Status Flags
-signFlag 				BYTE	0 ; False
-negFlag					BYTE	0 ; False
+signFlag 				DWORD	0 ; False
+negFlag					DWORD	0 ; False
+errorFlag				DWORD	0 ; False
 
 ; mGetString data
 inputPrompt				BYTE	"Input number: ",0
@@ -125,10 +128,11 @@ sumLabel				BYTE	"Sum: ",0
 averageLabel			BYTE	"Average: ",0
 
 
-
-
-
-; (insert variable definitions here)
+; Debug Flags
+enteredReadValFlag		BYTE	"Called PROC ReadVal",0
+exitedReadValFlag		BYTE	"Exited PROC ReadVal",0
+enteredmGetStringFlag	BYTE	"Invoked MACRO mGetString",0
+exitedMGetStringFlag	BYTE	"Left MACRO mGetString",0
 
 
 .code
@@ -149,20 +153,20 @@ main PROC
 	MOV		ECX, VALUE_STORAGE_SIZE 		
 	_readValLoop:
 	
-		; ReadVal inputs
+		; ReadVal inputs	
+		PUSH	OFFSET errorFlag			; [ebp+48]
 		PUSH	OFFSET signFlag				; [ebp+44] 
 		PUSH	OFFSET negFlag				; [ebp+40]
 		PUSH	OFFSET errorPromptNotInt	; [ebp+36]
 		PUSH	OFFSET errorPromptTooBig	; [ebp+32]
-		PUSH	OFFSET convertedArr			; [ebp+28]
-		
+
 		; ReadVal outputs
+		PUSH	OFFSET readValOutputArr		; [ebp+28]
 		PUSH	OFFSET sdwordValueArr		; [ebp+24]
 		
 		; mGetString inputs
 		PUSH	OFFSET inputPrompt			; [ebp+20]
 		MOV		EBX, count
-		
 		PUSH	EBX							; [ebp+16]
 		
 		; mGetString outputs				
@@ -171,7 +175,27 @@ main PROC
 
 		; Call ReadVal
 		CALL	ReadVal
-	
+
+		CALL	Crlf
+		; *********************** TEST **************************
+		MOV		ESI, OFFSET sdwordValueArr
+		PUSH	ECX
+		MOV		ECX, COUNT
+		CLD
+		_testLoop:
+		MOV		EAX, 0
+		LODSD
+		CALL	Crlf
+		CALL	WriteInt
+		CALL	Crlf
+
+		LOOP	_testLoop
+		
+		MOV		EDX, OFFSET exitedReadValFlag
+		; *********************** TEST **************************
+		CALL	Crlf
+
+		POP		ECX
 	LOOP _readValLoop
 
 	
@@ -181,6 +205,7 @@ main PROC
 	
 		PUSH 	OFFSET sdwordValueArr		; WriteVal inputs
 		PUSH	OFFSET displayStrArray		; mDisplayString inputs
+		CALL	WriteVal
 		
 		; Call WriteVal
 		CALL	WriteVal
@@ -188,8 +213,6 @@ main PROC
 	
 	
 	PUSH 	sdwordvalueArr					; DisplayCalculations input
-	
-	; CALL DisplayCalculations
 	CALL	DisplayCalculations
 	
 	
@@ -265,12 +288,13 @@ Introductions ENDP
 ;				ECX and EBX registers are restored to original values
 ;				
 ; 
-; Receives:		[ebp+44] = OFFSET signFlag
+; Receives:		[ebp+48] = OFFSET errorFlag		
+;				[ebp+44] = OFFSET signFlag
 ;				[ebp+40] = OFFSET negFlag
 ;				[ebp+36] = OFFSET errorPromptNotInt
 ;				[ebp+32] = OFFSET errorPromptTooBig
-;				[ebp+28] = OFFSET convertedArr
-;				[ebp+24] = OFFSET sdwordValueArr
+;				[ebp+28] = OFFSET readValOutputArr
+;				[ebp+24] = OFFSET convertedValueArr
 ;				[ebp+20] = OFFSET inputPrompt 
 ;				[ebp+16] = VALUE  count
 ;				[ebp+12] = OFFSET mGetStrInputArr
@@ -285,52 +309,110 @@ ReadVal PROC
 	PUSH	EBP
 	MOV		EBP, ESP
 	
-	; Save registers (ECX, EBX)
+	
+	; Save registers (ECX, EBX, EDX, ESI)
 	PUSH 	ECX
 	PUSH 	EBX
+	PUSH	EDX
+	PUSH	ESI
+
 
 	; Invoke macro mGetString 
 	mGetString [ebp+20], [ebp+16], [ebp+12], [ebp+8]
-
-	; Check numBytesRead
-	;CALL	Crlf
-	;MOV	EBX, [ebp+8]
-	;MOV	ECX, [EBX]
-	;CALL	WriteDec
-
-
+	
+	
 	; Setup ESI for _conversionLoop
 	CLD
-	MOV		ESI, [ebp+12]	; set to first index of mGetStrInputArr
-	MOV		EDI, [ebp+28]	; set to first index of convertedArr
+	MOV		ESI, [ebp+12]			; set to first index of BYTE mGetStrInputArr
+	MOV		EDI, [ebp+24]			; set to first index of SDWORD convertedValueArr
+	
 	
 	; Setup ECX for _conversionLoop
 	MOV		EBX, [ebp+8]
-	MOV		ECX, [EBX]		; ECX = numBytesRead
-	MOV		EBX, ECX		; EBX = numBytesRead
+	MOV		ECX, [EBX]				; ECX = numBytesRead
+	MOV		EBX, ECX				; EBX = numBytesRead
 	
+	
+	; Convert each ascii byte in mGetStrInputArr to its signed value, store in convertedValueArr
 	_conversionLoop:
-	LODSB
-	MOV		DL, AL
-	CALL	WriteString
-	
-	
-		
-		
-		
-	
-		
-		
-		
-		
-	
+		LODSB	
+
+		MOV		BL, AL
+		MOVZX	EAX, BL
+		SUB		EAX, 48
+
+		STOSD	
+	LOOP	_conversionLoop
 
 
+	; Clear errorFlag
+	MOV		ESI, [ebp+48]
+	MOV		[ESI], 0
 	
 	
+	; Setup ESI and ECX for _validateLoop
+	CLD
+	MOV		ESI, [ebp+24]
+	MOV		EBX, [ebp+8]
+	MOV		ECX, [EBX]				; ECX = numBytesRead
+	_validateLoop:
+		LODSD
+	
+		CMP		EAX, 0				; check for value less than 0
+		JL		_checkForPosSign
+		
+		CMP		EAX, 9				; check for value greater than 9
+		JG		_checkForPosSign	
+		
+		JMP		_continue			; found a value between 0 and 9
+		
+		
+		_checkForPosSign:
+		CMP		EAX, -5
+		JNE		_checkForNeg
 
-	_abortReadVal
-	; Restore registers (ECX, EBX)
+		MOV		EBX, [ebp+44]		; check signFlag
+		CMP		[EBX], 1
+		JE		_abortReadVal		; if set, jump to _abortReadVal (means we already encountered a sign at the first index)
+								
+		MOV		[ESI], 0			; else, assign 0 to current ESI, and continue
+		JMP		_continue
+		
+		
+		_checkForNeg:
+		CMP		EAX, -3
+		JNE		_abortReadVal		; value at ESI is not a -, +, or valid integer, so abort
+		
+		MOV 	EBX, [ebp+44]
+		CMP		[EBX], 1
+		JE		_abortReadVal		; if set, jump to _abortReadVal
+				
+		MOV		EBX, [ebp+40]		; else, set negFlag, assign 0 to current ESI, and continue
+		MOV		[EBX], 1
+		MOV		[ESI], 0
+		
+		
+	_continue:
+		MOV		EBX, [ebp+44]		; set the sign flag (we do this first on the first loop and then if we find any more signs, we abort)
+		MOV		[EBX], 1			
+	
+	LOOP	_validateLoop
+
+	
+	; invalid input found, so abort the ReadVal procedure without writing to readValOutputArr
+	_abortReadVal:
+	MOV		ESI, [ebp+48]			; Set Error Flag to 1 (True)
+	MOV		[ESI], 1
+	
+	MOV		ESI, [ebp+44]			; Clear sign flag
+	MOV		[ESI], 0
+	
+	MOV		ESI, [ebp+40]			; Clear neg flag
+	MOV		[ESI], 0
+
+	; Restore registers (ECX, EBX, EDX, ESI)
+	POP		ESI
+	POP		EDX
 	POP		EBX
 	POP		ECX
 	
