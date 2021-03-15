@@ -104,8 +104,8 @@ exampleInputPrompt		BYTE	"Example input: '-157' ... '+293' ... '3492'",0
 ; ReadVal data
 errorPromptNotInt		BYTE	"The input failed because your input included a non-integer value or invalid symbol. Please try again.",0
 errorPromptTooBig		BYTE	"The value you input was too large. Please try again.",0
-readValOutputArr		SDWORD	VALUE_STORAGE_SIZE DUP(?)
-convertedValueArr		SDWORD	MAX_INPUT_SIZE DUP(?)
+readValOutputArr		SDWORD	VALUE_STORAGE_SIZE DUP("$")
+convertedValueArr		SDWORD	MAX_INPUT_SIZE DUP("$")
 
 ; ReadVal Status Flags
 signFlag 				DWORD	0 ; False
@@ -116,7 +116,7 @@ errorFlag				DWORD	0 ; False
 inputPrompt				BYTE	"Input number: ",0
 count					DWORD	MAX_INPUT_SIZE
 mGetStrInputArr			BYTE	MAX_INPUT_SIZE DUP(?)
-numBytesRead			DWORD	?
+numBytesRead			DWORD	0
 
 
 ; WriteVal/mDisplayString data
@@ -298,96 +298,181 @@ ReadVal PROC
 
 	; Invoke macro mGetString 
 	mGetString [ebp+20], [ebp+16], [ebp+12], [ebp+8]
+
+	; Verify that numBytesWritten != 0
+	MOV		ESI, [ebp+8]
+	CMP		DWORD PTR [ESI], 0
+	JNE		_continueWithConversion
+	; *** TODO: PRINT ERROR MESSAGE HERE ***
+	JMP		_abortReadVal
 	
-	
-	; Setup ESI for _conversionLoop
+	_continueWithConversion:		; Setup ESI for _conversionLoop
 	CLD
-	MOV		ESI, [ebp+12]			; set to first index of BYTE mGetStrInputArr
-	MOV		EDI, [ebp+24]			; set to first index of SDWORD convertedValueArr
+	MOV		ESI, [ebp+12]			; Set to first index of BYTE mGetStrInputArr
+	MOV		EDI, [ebp+24]			; Set to first index of SDWORD convertedValueArr
 	
-	
-	; Setup ECX for _conversionLoop
-	MOV		EBX, [ebp+8]
+	MOV		EBX, [ebp+8]			; Setup ECX for _conversionLoop
 	MOV		ECX, [EBX]				; ECX = numBytesRead
-	MOV		EBX, ECX				; EBX = numBytesRead
-	
-	
-	; Convert each ascii byte in mGetStrInputArr to its signed value, store in convertedValueArr
-	_conversionLoop:
+	MOV		EBX, ECX				; EBX = numBytesRead	
+
+
+									
+	_conversionLoop:				; Convert each ascii byte in mGetStrInputArr to its signed value,
 		LODSB	
 
 		MOV		BL, AL
 		MOVZX	EAX, BL
 		SUB		EAX, 48
 
-		STOSD	
+		STOSD						 ; Store converted value in convertedValueArr
 	LOOP	_conversionLoop
 
-
-	; Clear errorFlag
-	MOV		ESI, [ebp+48]
+	MOV		ESI, [ebp+48]			; Clear errorFlag
 	MOV		EBX, 0
 	MOV		[ESI], EBX
 	
 	
-	; Setup ESI and ECX for _validateLoop
-	CLD
+	CLD								; Setup ESI and ECX for _validateLoop
 	MOV		ESI, [ebp+24]
 	MOV		EBX, [ebp+8]
 	MOV		ECX, [EBX]				; ECX = numBytesRead
-	_validateLoop:
-		LODSD
-
-		MOV		EDX, OFFSET flag1
-		CALL	WriteString
-		CALL	Crlf
 	
-		CMP		EAX, 0				; check for value less than 0
+	_validateLoop:					; Validate input for non-integer characters (except for "+" and "-" at beginning)
+		LODSD
+	
+		CMP		EAX, 0				; Check for value less than 0
 		JL		_checkForPosSign
 		
-		CMP		EAX, 9				; check for value greater than 9
+		CMP		EAX, 9				; Check for value greater than 9
 		JG		_checkForPosSign	
 		
-		JMP		_continue			; found a value between 0 and 9
+		JMP		_continue			; Found a value between 0 and 9
 		
 		
-		_checkForPosSign:
+		_checkForPosSign:			; Check if we encountered a "+" symbol
 		CMP		EAX, -5
 		JNE		_checkForNeg
 
-		MOV		EBX, [ebp+44]		; check signFlag
+		MOV		EBX, [ebp+44]		; Check signFlag
 		CMP		DWORD PTR [EBX], 1
-		JE		_abortReadVal		; if set, jump to _abortReadVal (means we already encountered a sign at the first index)
+		JE		_abortReadVal		; If set, jump to _abortReadVal (means we already encountered a sign at the first index)
 		
-		MOV		EDI, [ebp+24]		; else, assign 0 to first index of array, and continue	
+		MOV		EDI, [ebp+24]		; Else: assign 0 to first index of array, and continue	
 		MOV		SDWORD PTR [EDI], 0
 		JMP		_continue
 		
-		_checkForNeg:
+		_checkForNeg:				; Check if we encountered a "-" symbol
 		CMP		EAX, -3
-		JNE		_abortReadVal		; value at ESI is not a -, +, or valid integer, so abort
+		JNE		_abortReadVal		; Value at ESI is not a -, +, or valid integer, so abort
 		
 		MOV 	EBX, [ebp+44]
 		CMP		DWORD PTR [EBX], 1
-		JE		_abortReadVal		; if set, jump to _abortReadVal
+		JE		_abortReadVal		; If set, jump to _abortReadVal
 			
 		MOV		EDI, [ebp+40]		; else, set negFlag, assign 0 to current ESI, and continue		
 		MOV		DWORD PTR [EDI], 1
 		
 		MOV		EDI, [ebp+24]
 		MOV		SDWORD PTR [EDI], 0
-		
-		
-	_continue:
-		PUSH	ESI					; set the sign flag (we do this first on the first loop and then if we find any more signs, we abort)
-		MOV		ESI, [ebp+44]
-		MOV		EBX, 1
-		MOV		[ESI], EBX
-		POP		ESI				
 	
+	_continue:
+		PUSH	ESI					; set the signflag (we do this first on the first loop and then if we find any more signs, we abort)
+		MOV		ESI, [ebp+44]
+		MOV		SDWORD PTR [ESI], 1
+		POP		ESI				
 	LOOP	_validateLoop
 
-	; Generate value to store in readValOutputArr
+	_checkForOnlySignValueAndNotOtherInput:
+	MOV		ESI, [ebp+24]
+	ADD		ESI, 4
+	CMP		SDWORD PTR [ESI], "$"
+	JNE		_generateValue
+	; *** TODO: PRINT ERROR MESSAGE HERE ***
+	JMP		_abortReadVal
+
+
+	_generateValue:
+	
+	MOV		ESI, [ebp+24]
+	CMP		SDWORD PTR [ESI], 0			; Detect a sign character
+	JE		_firstIndexIsZero
+	; Setup for input with no sign character
+															
+	MOV		ESI, [ebp+8]
+	MOV		ECX, [ESI]					; Setup ECX for _generatePower loop
+	PUSH	ECX							; Save that ECX value for later when we hit _generateValueLoop
+
+	MOV		ESI, [ebp+24]				; Setup ESI for _generateValueLoop
+	PUSH	ESI
+
+	MOV		EAX, 1
+	JMP		_generatePower
+	
+	
+	_firstIndexIsZero:					; Setup for input value that included a sign character
+	MOV		ESI, [ebp+8]
+	MOV		ECX, [ESI]			
+	DEC		ECX							; Setup ECX for _generatePower loop
+	PUSH	ECX							; Save that ECX value for later when we hit _generateValueLoop
+
+	MOV		ESI, [ebp+24]				; Setup ESI for _generateValueLoop
+	ADD		ESI, 4
+	PUSH	ESI
+	
+	MOV		EAX, 1
+	_generatePower:
+		CMP		ECX, 1					; If ECX is at the ones place, then we can exit the loop
+		JE		_breakFromGeneratePower
+		MOV		EBX, 10
+		MUL		EBX						
+		MOV		EBX, EAX
+	LOOP _generatePower
+	
+	_breakFromGeneratePower:
+	; ******************** TESTING ONLY *********************
+	CALL	Crlf
+	CALL	WriteDec
+	CALL	Crlf
+	; ********************* END TEST ************************
+
+	MOV		EBX, EAX					; EBX holds our power
+	
+	
+	POP		ESI							; ECX and ESI already set when setting up _generatePower, so we POP from stack
+	POP		ECX							
+	MOV		EAX, [ESI]
+	CALL	Crlf
+	CALL	WriteDec
+	CALL	Crlf
+	
+	MOV		EAX, ECX					; Clear EAX, EBX has previously been set to our initial power in _generatePower
+	CLD
+	_generateValueLoop:
+		PUSH	EBX
+		PUSH	EAX
+		LODSD
+		MUL		EBX
+		MOV		EBX, EAX
+		POP		EAX
+		ADD		EAX, EBX
+		POP		EBX
+		PUSH	EAX
+		MOV		EAX, EBX
+		MOV		EBX, 10
+		MOV		EDX, 0
+		DIV		EBX							; update the power
+		MOV		EBX, EAX
+		POP		EAX
+
+		CMP		EBX, 10						; once the power is at zero, break
+		JE		_exitGenerateValueLoop
+
+	LOOP _generateValueLoop
+
+	_exitGenerateValueLoop:
+	CALL	Crlf
+	CALL	WriteDec
+	CALL	Crlf
 
 	; Check to see if neg flag was set, if it was, IMUL generated value by -1
 
@@ -406,7 +491,7 @@ ReadVal PROC
 	CALL	WriteString
 	CALL	Crlf
 
-	MOV		ESI, [ebp+48]			; Set the errorFlag
+	MOV		ESI, [ebp+48]				; Set the errorFlag
 	MOV		DWORD PTR [ESI], 1
 
 	_cleanUp:
@@ -417,10 +502,10 @@ ReadVal PROC
 		MOV		ESI, [ebp+40]			; Clear negFlag
 		MOV		DWORD PTR [ESI], 0
 
-
-
+		; *************************************
+		; FOR TESTING PURPOSES - DELETE LATER
 		MOV		ECX, MAX_INPUT_SIZE
-		MOV		ESI, OFFSET convertedValueArr
+		MOV		ESI, [ebp+24]
 		_testLoop1:
 		MOV		EAX, 0
 		MOV		EAX, [ESI]
@@ -430,12 +515,13 @@ ReadVal PROC
 		ADD		ESI, 4
 
 		LOOP _testLoop1
+		; END TEST
+		;***************************************
 
-		
 		MOV		ECX, MAX_INPUT_SIZE
 		MOV		ESI, [ebp+24]
 		_resetConvertedValueArr:		
-		MOV		SDWORD PTR [ESI], 0
+		MOV		SDWORD PTR [ESI], "$"
 		ADD		ESI, 4
 		LOOP	_resetConvertedValueArr
 
